@@ -22,6 +22,15 @@ package android.text;
  */
 /* package */ class AndroidBidi {
 
+    /**
+     * Run the Unicode BiDi algorithm on the given characters.
+     * @param dir Primary direction of the paragraph.
+     * @param chs Paragpraph characters.
+     * @param chInfo Character directionalities on inputs, their embedding levels on output.
+     * @param n Length of paragraph.
+     * @param haveInfo Are the directionalities provided?
+     * @return Resulting primary direction of the paragraph.
+     */
     public static int bidi(int dir, char[] chs, byte[] chInfo, int n, boolean haveInfo) {
         if (chs == null || chInfo == null) {
             throw new NullPointerException();
@@ -38,8 +47,13 @@ package android.text;
             case Layout.DIR_REQUEST_DEFAULT_RTL: dir = -1; break;
             default: dir = 0; break;
         }
+        
+        // Get character directionalities if they are not provided
+        if (!haveInfo) {
+            AndroidCharacter.getDirectionalities(chs, chInfo, n);
+        }
 
-        int result = runBidi(dir, chs, chInfo, n, haveInfo);
+        int result = runBidi(dir, chs, chInfo, n, true);
         result = (result & 0x1) == 0 ? Layout.DIR_LEFT_TO_RIGHT : Layout.DIR_RIGHT_TO_LEFT;
         return result;
     }

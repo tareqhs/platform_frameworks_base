@@ -25,7 +25,7 @@
 
 namespace android {
     
-static jint runBidi(JNIEnv* env, jobject obj, jint dir, jcharArray chsArray, 
+static jint runBidi(JNIEnv* env, jclass c, jint dir, jcharArray chsArray, 
                     jbyteArray infoArray, int n, jboolean haveInfo)
 {
     // Parameters are checked on java side
