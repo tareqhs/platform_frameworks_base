@@ -98,7 +98,7 @@ extends Layout
                  spacingmult, spacingadd, includepad, includepad,
                  ellipsize != null, ellipsizedWidth, ellipsize);
 
-        mChdirs = null;
+        mChInfo = null;
         mChs = null;
         mWidths = null;
         mFontMetricsInt = null;
@@ -132,13 +132,13 @@ extends Layout
         int bufsiz = end >= 0 ? end - bufstart : bufend - bufstart;
         boolean first = true;
 
-        if (mChdirs == null) {
-            mChdirs = new byte[ArrayUtils.idealByteArraySize(bufsiz + 1)];
+        if (mChInfo == null) {
+            mChInfo = new byte[ArrayUtils.idealByteArraySize(bufsiz + 1)];
             mChs = new char[ArrayUtils.idealCharArraySize(bufsiz + 1)];
             mWidths = new float[ArrayUtils.idealIntArraySize((bufsiz + 1) * 2)];
         }
 
-        byte[] chdirs = mChdirs;
+        byte[] chinfo = mChInfo;
         char[] chs = mChs;
         float[] widths = mWidths;
 
@@ -206,9 +206,9 @@ extends Layout
                 }
             }
 
-            if (end - start > chdirs.length) {
-                chdirs = new byte[ArrayUtils.idealByteArraySize(end - start)];
-                mChdirs = chdirs;
+            if (end - start > chinfo.length) {
+                chinfo = new byte[ArrayUtils.idealByteArraySize(end - start)];
+                mChInfo = chinfo;
             }
             if (end - start > chs.length) {
                 chs = new char[ArrayUtils.idealCharArraySize(end - start)];
@@ -252,18 +252,17 @@ extends Layout
             }
 
             if (!easy) {
-                // XXX put override flags, etc. into chdirs
-                dir = bidi(dir, chs, chdirs, n, false);
+                // After this chinfo contains the embedding levels
+                dir = AndroidBidi.bidi(dir, chs, chinfo, n, false);
 
                 // Do mirroring for right-to-left segments
 
                 for (int i = 0; i < n; i++) {
-                    if (chdirs[i] == Character.DIRECTIONALITY_RIGHT_TO_LEFT) {
+                    if ((chinfo[i] % 2) == 1) {
                         int j;
 
                         for (j = i; j < n; j++) {
-                            if (chdirs[j] !=
-                                Character.DIRECTIONALITY_RIGHT_TO_LEFT)
+                            if ((chinfo[j] % 2) == 0)
                                 break;
                         }
 
@@ -462,7 +461,7 @@ extends Layout
                                     v,
                                     spacingmult, spacingadd, chooseht,
                                     choosehtv, fm, tab,
-                                    needMultiply, start, chdirs, dir, easy,
+                                    needMultiply, start, chinfo, dir, easy,
                                     ok == bufend, includepad, trackpad,
                                     widths, start, end - start,
                                     where, ellipsizedWidth, okwidth,
@@ -498,7 +497,7 @@ extends Layout
                                     v,
                                     spacingmult, spacingadd, chooseht,
                                     choosehtv, fm, tab,
-                                    needMultiply, start, chdirs, dir, easy,
+                                    needMultiply, start, chinfo, dir, easy,
                                     ok == bufend, includepad, trackpad,
                                     widths, start, end - start,
                                     where, ellipsizedWidth, okwidth,
@@ -514,7 +513,7 @@ extends Layout
                                     v,
                                     spacingmult, spacingadd, chooseht,
                                     choosehtv, fm, tab,
-                                    needMultiply, start, chdirs, dir, easy,
+                                    needMultiply, start, chinfo, dir, easy,
                                     fit == bufend, includepad, trackpad,
                                     widths, start, end - start,
                                     where, ellipsizedWidth, fitwidth,
@@ -534,7 +533,7 @@ extends Layout
                                     v,
                                     spacingmult, spacingadd, chooseht,
                                     choosehtv, fm, tab,
-                                    needMultiply, start, chdirs, dir, easy,
+                                    needMultiply, start, chinfo, dir, easy,
                                     here + 1 == bufend, includepad,
                                     trackpad,
                                     widths, start, end - start,
@@ -580,7 +579,7 @@ extends Layout
                         v,
                         spacingmult, spacingadd, chooseht,
                         choosehtv, fm, tab,
-                        needMultiply, start, chdirs, dir, easy,
+                        needMultiply, start, chinfo, dir, easy,
                         end == bufend, includepad, trackpad,
                         widths, start, end - start,
                         where, ellipsizedWidth, w, paint);
@@ -603,7 +602,7 @@ extends Layout
                     v,
                     spacingmult, spacingadd, null,
                     null, fm, false,
-                    needMultiply, bufend, chdirs, DEFAULT_DIR, true,
+                    needMultiply, bufend, chinfo, DEFAULT_DIR, true,
                     true, includepad, trackpad,
                     widths, bufstart, 0,
                     where, ellipsizedWidth, 0, paint);
@@ -991,7 +990,7 @@ extends Layout
                       float spacingmult, float spacingadd,
                       LineHeightSpan[] chooseht, int[] choosehtv,
                       Paint.FontMetricsInt fm, boolean tab,
-                      boolean needMultiply, int pstart, byte[] chdirs,
+                      boolean needMultiply, int pstart, byte[] chlevels,
                       int dir, boolean easy, boolean last,
                       boolean includepad, boolean trackpad,
                       float[] widths, int widstart, int widoff,
@@ -1085,45 +1084,16 @@ extends Layout
         {
             lines[off + DIR] |= dir << DIR_SHIFT;
 
-            int cur = Character.DIRECTIONALITY_LEFT_TO_RIGHT;
-            int count = 0;
-
-            if (!easy) {
-                for (int k = start; k < end; k++) {
-                    if (chdirs[k - pstart] != cur) {
-                        count++;
-                        cur = chdirs[k - pstart];
-                    }
-                }
-            }
-
             Directions linedirs;
 
-            if (count == 0) {
-                linedirs = DIRS_ALL_LEFT_TO_RIGHT;
+            if (easy) {
+                linedirs = Layout.DIRS_ALL_LEFT_TO_RIGHT;
             } else {
-                short[] ld = new short[count + 1];
-
-                cur = Character.DIRECTIONALITY_LEFT_TO_RIGHT;
-                count = 0;
-                int here = start;
-
-                for (int k = start; k < end; k++) {
-                    if (chdirs[k - pstart] != cur) {
-                        // XXX check to make sure we don't
-                        //     overflow short
-                        ld[count++] = (short) (k - here);
-                        cur = chdirs[k - pstart];
-                        here = k;
-                    }
-                }
-
-                ld[count] = (short) (end - here);
-
-                if (count == 1 && ld[0] == 0) {
-                    linedirs = DIRS_ALL_RIGHT_TO_LEFT;
+                Bidirections dirs = mBidiF.createBidirections(chlevels, start, end);
+                if (dirs == Bidirections.ALL_RTL) {
+                    linedirs = Layout.DIRS_ALL_RIGHT_TO_LEFT;
                 } else {
-                    linedirs = new Directions(ld);
+                    linedirs = new Directions(dirs);
                 }
             }
 
@@ -1334,7 +1304,8 @@ extends Layout
     /*
      * These are reused across calls to generate()
      */
-    private byte[] mChdirs;
+    private Bidirections.BidirectionsFactory mBidiF = new Bidirections.BidirectionsFactory();
+    private byte[] mChInfo;
     private char[] mChs;
     private float[] mWidths;
     private Paint.FontMetricsInt mFontMetricsInt = new Paint.FontMetricsInt();

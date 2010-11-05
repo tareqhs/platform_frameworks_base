@@ -356,9 +356,9 @@ public abstract class Layout {
                 }
             }
 
-            Directions directions = getLineDirections(i);
+            Bidirections directions = getLineDirections(i).d;
             boolean hasTab = getLineContainsTab(i);
-            if (directions == DIRS_ALL_LEFT_TO_RIGHT &&
+            if (directions == Bidirections.ALL_LTR &&
                     !spannedText && !hasTab) {
                 if (DEBUG) {
                     Assert.assertTrue(dir == DIR_LEFT_TO_RIGHT);
@@ -554,7 +554,7 @@ public abstract class Layout {
         int end = getLineVisibleEnd(line);
         int dir = getParagraphDirection(line);
         boolean tab = getLineContainsTab(line);
-        Directions directions = getLineDirections(line);
+        Bidirections directions = getLineDirections(line).d;
 
         TabStopSpan[] tabs = null;
         if (tab && mText instanceof Spanned) {
@@ -744,7 +744,7 @@ public abstract class Layout {
     public int getOffsetForHorizontal(int line, float horiz) {
         int max = getLineEnd(line) - 1;
         int min = getLineStart(line);
-        Directions dirs = getLineDirections(line);
+        Bidirections dirs = getLineDirections(line).d;
 
         if (line == getLineCount() - 1)
             max++;
@@ -755,10 +755,11 @@ public abstract class Layout {
         int best = min;
         float bestdist = Math.abs(getPrimaryHorizontal(best) - horiz);
 
-        int here = min;
-        for (int i = 0; i < dirs.mDirections.length; i++) {
-            int there = here + dirs.mDirections[i];
-            int swap = ((i & 1) == 0) ? 1 : -1;
+        for (int i = 0; i < dirs.getRunCount(); i++) {
+            int r = dirs.getVisualRun(i);
+            int here = min + dirs.getRunStart(r);
+            int there = here + dirs.getRunLength(r);
+          //int swap = dirs.isReversed(r) ? -1 : 1;
 
             if (there > max)
                 there = max;
@@ -769,7 +770,8 @@ public abstract class Layout {
                 guess = (high + low) / 2;
                 int adguess = getOffsetAtStartOf(guess);
 
-                if (getPrimaryHorizontal(adguess) * swap >= horiz * swap)
+              //if (getPrimaryHorizontal(adguess) * swap >= horiz * swap)
+                if (getPrimaryHorizontal(adguess) >= horiz)
                     high = guess;
                 else
                     low = guess;
@@ -806,7 +808,6 @@ public abstract class Layout {
                 best = here;
             }
 
-            here = there;
         }
 
         float dist = Math.abs(getPrimaryHorizontal(max) - horiz);
@@ -893,7 +894,7 @@ public abstract class Layout {
         int line = getLineForOffset(offset);
         int start = getLineStart(line);
         int end = getLineEnd(line);
-        Directions dirs = getLineDirections(line);
+        Bidirections dirs = getLineDirections(line).d;
 
         if (line != getLineCount() - 1)
             end = TextUtils.getOffsetBefore(mText, end);
@@ -925,8 +926,8 @@ public abstract class Layout {
         }
 
         int here = start;
-        for (int i = 0; i < dirs.mDirections.length; i++) {
-            int there = here + dirs.mDirections[i];
+        for (int i = 0; i < dirs.getRunCount(); i++) {
+            int there = here + dirs.getRunLength(i);
             if (there > end)
                 there = end;
 
@@ -993,7 +994,7 @@ public abstract class Layout {
         int line = getLineForOffset(offset);
         int start = getLineStart(line);
         int end = getLineEnd(line);
-        Directions dirs = getLineDirections(line);
+        Bidirections dirs = getLineDirections(line).d;
 
         if (line != getLineCount() - 1)
             end = TextUtils.getOffsetBefore(mText, end);
@@ -1025,8 +1026,8 @@ public abstract class Layout {
         }
 
         int here = start;
-        for (int i = 0; i < dirs.mDirections.length; i++) {
-            int there = here + dirs.mDirections[i];
+        for (int i = 0; i < dirs.getRunCount(); i++) {
+            int there = here + dirs.getRunLength(i);
             if (there > end)
                 there = end;
 
@@ -1202,14 +1203,14 @@ public abstract class Layout {
                               int top, int bottom, Path dest) {
         int linestart = getLineStart(line);
         int lineend = getLineEnd(line);
-        Directions dirs = getLineDirections(line);
+        Bidirections dirs = getLineDirections(line).d;
 
         if (lineend > linestart && mText.charAt(lineend - 1) == '\n')
             lineend--;
 
         int here = linestart;
-        for (int i = 0; i < dirs.mDirections.length; i++) {
-            int there = here + dirs.mDirections[i];
+        for (int i = 0; i < dirs.getRunCount(); i++) {
+            int there = here + dirs.getRunLength(i);
             if (there > lineend)
                 there = lineend;
 
@@ -1376,14 +1377,14 @@ public abstract class Layout {
 
     private void drawText(Canvas canvas,
                                  CharSequence text, int start, int end,
-                                 int dir, Directions directions,
+                                 int dir, Bidirections directions,
                                  float x, int top, int y, int bottom,
                                  TextPaint paint,
                                  TextPaint workPaint,
                                  boolean hasTabs, Object[] parspans) {
         char[] buf;
         if (!hasTabs) {
-            if (directions == DIRS_ALL_LEFT_TO_RIGHT) {
+            if (directions == Bidirections.ALL_LTR) {
                 if (DEBUG) {
                     Assert.assertTrue(DIR_LEFT_TO_RIGHT == dir);
                 }
@@ -1398,20 +1399,22 @@ public abstract class Layout {
 
         float h = 0;
 
-        int here = 0;
-        for (int i = 0; i < directions.mDirections.length; i++) {
-            int there = here + directions.mDirections[i];
+        for (int i = 0; i < directions.getRunCount(); i++) {
+            int r = directions.getVisualRun(i);
+            int here = directions.getRunStart(r);
+            int there = here + directions.getRunLength(r);
             if (there > end - start)
                 there = end - start;
+            boolean reversed = directions.isReversed(r);
 
             int segstart = here;
             for (int j = hasTabs ? here : there; j <= there; j++) {
                 if (j == there || buf[j] == '\t') {
                     h += Styled.drawText(canvas, text,
                                          start + segstart, start + j,
-                                         dir, (i & 1) != 0, x + h,
+                                         dir, reversed, x + h,
                                          top, y, bottom, paint, workPaint,
-                                         start + j != end);
+                                         r < directions.getRunCount() || j != there);
 
                     if (j != there && buf[j] == '\t')
                         h = dir * nextTab(text, start, end, h * dir, parspans);
@@ -1427,9 +1430,9 @@ public abstract class Layout {
                         if (bm != null) {
                             h += Styled.drawText(canvas, text,
                                                  start + segstart, start + j,
-                                                 dir, (i & 1) != 0, x + h,
+                                                 dir, reversed, x + h,
                                                  top, y, bottom, paint, workPaint,
-                                                 start + j != end);
+                                                 r < directions.getRunCount() || j != there);
 
                             if (mEmojiRect == null) {
                                 mEmojiRect = new RectF();
@@ -1457,8 +1460,6 @@ public abstract class Layout {
                     }
                 }
             }
-
-            here = there;
         }
 
         if (hasTabs)
@@ -1469,7 +1470,7 @@ public abstract class Layout {
                                      TextPaint workPaint,
                                      CharSequence text,
                                      int start, int offset, int end,
-                                     int dir, Directions directions,
+                                     int dir, Bidirections directions,
                                      boolean trailing, boolean alt,
                                      boolean hasTabs, Object[] tabs) {
         char[] buf = null;
@@ -1486,14 +1487,14 @@ public abstract class Layout {
                 trailing = !trailing;
         }
 
-        int here = 0;
-        for (int i = 0; i < directions.mDirections.length; i++) {
-            if (alt)
-                trailing = !trailing;
-
-            int there = here + directions.mDirections[i];
+        for (int i = 0; i < directions.getRunCount(); i++) {
+            int r = directions.getVisualRun(i);
+            int here = directions.getRunStart(r);
+            int there = here + directions.getRunLength(r);
             if (there > end - start)
                 there = end - start;
+            boolean reversed = directions.isReversed(r);
+            boolean thisTrailing = (alt && !reversed) ? (!trailing) : (trailing);
 
             int segstart = here;
             for (int j = hasTabs ? here : there; j <= there; j++) {
@@ -1515,16 +1516,16 @@ public abstract class Layout {
                 if (j == there || codept == '\t' || bm != null) {
                     float segw;
 
-                    if (offset < start + j ||
-                       (trailing && offset <= start + j)) {
-                        if (dir == DIR_LEFT_TO_RIGHT && (i & 1) == 0) {
+                    if (offset >= here && (offset < start + j ||
+                       (thisTrailing && offset <= start + j))) {
+                        if (dir == DIR_LEFT_TO_RIGHT && !reversed) {
                             h += Styled.measureText(paint, workPaint, text,
                                                     start + segstart, offset,
                                                     null);
                             return h;
                         }
 
-                        if (dir == DIR_RIGHT_TO_LEFT && (i & 1) != 0) {
+                        if (dir == DIR_RIGHT_TO_LEFT && reversed) {
                             h -= Styled.measureText(paint, workPaint, text,
                                                     start + segstart, offset,
                                                     null);
@@ -1536,8 +1537,8 @@ public abstract class Layout {
                                               start + segstart, start + j,
                                               null);
 
-                    if (offset < start + j ||
-                        (trailing && offset <= start + j)) {
+                    if (offset >= here && (offset < start + j ||
+                        (thisTrailing && offset <= start + j))) {
                         if (dir == DIR_LEFT_TO_RIGHT) {
                             h += segw - Styled.measureText(paint, workPaint,
                                                            text,
@@ -1588,8 +1589,6 @@ public abstract class Layout {
                     segstart = j + 1;
                 }
             }
-
-            here = there;
         }
 
         if (hasTabs)
@@ -1808,24 +1807,16 @@ public abstract class Layout {
 
     /**
      * Stores information about bidirectional (left-to-right or right-to-left)
-     * text within the layout of a line.  TODO: This work is not complete
-     * or correct and will be fleshed out in a later revision.
+     * text within the layout of a line.
+     * TODO Change the API to use android.text.Bidirections directly.
+     *      It's a bad practice to use an inner class for this purpose anyway..
      */
     public static class Directions {
-        private short[] mDirections;
-
-        // The values in mDirections are the offsets from the first character
-        // in the line to the next flip in direction.  Runs at even indices
-        // are left-to-right, the others are right-to-left.  So, for example,
-        // a line that starts with a right-to-left run has 0 at mDirections[0],
-        // since the 'first' (ltr) run is zero length.
-        //
-        // The code currently assumes that each run is adjacent to the previous
-        // one, progressing in the base line direction.  This isn't sufficient
-        // to handle nested runs, for example numeric text in an rtl context
-        // in an ltr paragraph.
-        /* package */ Directions(short[] dirs) {
-            mDirections = dirs;
+        // We simply wrap the real information object. We can't change the
+        // public API because the build prohibits that
+        private final Bidirections d;
+        /* package */ Directions(Bidirections d) {
+            this.d = d;
         }
     }
 
@@ -1957,8 +1948,8 @@ public abstract class Layout {
     private static final int TAB_INCREMENT = 20;
 
     /* package */ static final Directions DIRS_ALL_LEFT_TO_RIGHT =
-                                       new Directions(new short[] { 32767 });
+                                       new Directions(Bidirections.ALL_LTR);
     /* package */ static final Directions DIRS_ALL_RIGHT_TO_LEFT =
-                                       new Directions(new short[] { 0, 32767 });
+                                       new Directions(Bidirections.ALL_RTL);
 
 }
