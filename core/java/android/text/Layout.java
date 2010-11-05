@@ -759,7 +759,7 @@ public abstract class Layout {
             int r = dirs.getVisualRun(i);
             int here = min + dirs.getRunStart(r);
             int there = here + dirs.getRunLength(r);
-          //int swap = dirs.isReversed(r) ? -1 : 1;
+            int swap = dirs.isReversed(r) ? -1 : 1;
 
             if (there > max)
                 there = max;
@@ -770,8 +770,7 @@ public abstract class Layout {
                 guess = (high + low) / 2;
                 int adguess = getOffsetAtStartOf(guess);
 
-              //if (getPrimaryHorizontal(adguess) * swap >= horiz * swap)
-                if (getPrimaryHorizontal(adguess) >= horiz)
+                if (getPrimaryHorizontal(adguess) * swap >= horiz * swap)
                     high = guess;
                 else
                     low = guess;
