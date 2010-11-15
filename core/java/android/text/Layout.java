@@ -1413,7 +1413,7 @@ public abstract class Layout {
                                          start + segstart, start + j,
                                          dir, reversed, x + h,
                                          top, y, bottom, paint, workPaint,
-                                         i < directions.getRunCount() || j != there);
+                                         i+1 < directions.getRunCount() || j != there);
 
                     if (j != there && buf[j] == '\t')
                         h = dir * nextTab(text, start, end, h * dir, parspans);
@@ -1431,7 +1431,7 @@ public abstract class Layout {
                                                  start + segstart, start + j,
                                                  dir, reversed, x + h,
                                                  top, y, bottom, paint, workPaint,
-                                                 i < directions.getRunCount() || j != there);
+                                                 i+1 < directions.getRunCount() || j != there);
 
                             if (mEmojiRect == null) {
                                 mEmojiRect = new RectF();

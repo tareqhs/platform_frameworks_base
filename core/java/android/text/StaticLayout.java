@@ -1089,7 +1089,8 @@ extends Layout
             if (easy) {
                 linedirs = Layout.DIRS_ALL_LEFT_TO_RIGHT;
             } else {
-                Bidirections dirs = mBidiF.createBidirections(chlevels, start, end);
+                Bidirections dirs = mBidiF.createBidirections(
+                        chlevels, start - pstart, end - pstart);
                 if (dirs == Bidirections.ALL_RTL) {
                     linedirs = Layout.DIRS_ALL_RIGHT_TO_LEFT;
                 } else {
