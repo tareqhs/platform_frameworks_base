@@ -47,13 +47,8 @@ package android.text;
             case Layout.DIR_REQUEST_DEFAULT_RTL: dir = -1; break;
             default: dir = 0; break;
         }
-        
-        // Get character directionalities if they are not provided
-        if (!haveInfo) {
-            AndroidCharacter.getDirectionalities(chs, chInfo, n);
-        }
 
-        int result = runBidi(dir, chs, chInfo, n, true);
+        int result = runBidi(dir, chs, chInfo, n, haveInfo);
         result = (result & 0x1) == 0 ? Layout.DIR_LEFT_TO_RIGHT : Layout.DIR_RIGHT_TO_LEFT;
         return result;
     }
